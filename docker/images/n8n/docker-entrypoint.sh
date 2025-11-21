@@ -1,15 +1,26 @@
 #!/bin/sh
-if [ -d /opt/custom-certificates ]; then
-  echo "Trusting custom certificates from /opt/custom-certificates."
-  export NODE_OPTIONS="--use-openssl-ca $NODE_OPTIONS"
-  export SSL_CERT_DIR=/opt/custom-certificates
-  c_rehash /opt/custom-certificates
+
+set -e
+
+# ---------------------------------------
+# n8n Render-Optimized Entrypoint
+# ---------------------------------------
+
+# Make sure correct timezone is set
+if [ -n "$GENERIC_TIMEZONE" ]; then
+    export TZ=$GENERIC_TIMEZONE
 fi
 
-if [ "$#" -gt 0 ]; then
-  # Got started with arguments
-  exec n8n "$@"
-else
-  # Got started without arguments
-  exec n8n
-fi
+# Avoid Render sleep crash
+export N8N_DISABLE_PRODUCTION_MAIN_PROCESS=true
+
+# Create necessary folders
+mkdir -p /home/node/.n8n
+mkdir -p /files
+
+# Run database migrations before starting n8n
+echo "Running database migrations..."
+n8n migrate:latest || true
+
+echo "Starting n8n..."
+exec n8n start --tunnel
